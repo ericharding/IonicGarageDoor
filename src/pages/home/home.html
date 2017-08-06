@@ -2,7 +2,7 @@
   <!-- Title -->
   <h3 *ngIf="!hasDoor" text-center> Please select a door </h3>
   <div *ngIf="hasDoor" text-center>
-    <h1> {{ activeDoor.name }} is <span [ngClass]="(isOnline|async)?'online':'offline'">{{isOpenText|async}}</span> </h1>
+    <h1> {{ activeDoor.name }} {{(isOnline|async)? 'is' : 'was'}} <span [ngClass]="(isOnline|async)?'online':'offline'">{{isOpenText|async}}</span> </h1>
     <img *ngIf="isOpen | async" src="img/garage-open.png" />
     <img *ngIf="!(isOpen|async)" src="img/garage-closed.png" />
     <button ion-button primary (click)=toggle_door() style="margin-top: 10%">TOGGLE</button>

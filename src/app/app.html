@@ -9,6 +9,9 @@
     <ion-list>
       <button menuClose ion-item *ngFor="let d of doors | async" (click)="selectDoor(d)">
         {{d.name}}
+        <span *ngIf="d.isOnline|async" end>
+          <ion-icon name="wifi"></ion-icon>
+        </span>
       </button>
     </ion-list>
   </ion-content>
