@@ -10,6 +10,7 @@ import 'rxjs/Rx';
 import { Observable } from 'rxjs/Observable';
 import { Observer } from 'rxjs/Observer';
 import { Subject } from 'rxjs/Subject';
+import { BehaviorSubject} from 'rxjs/BehaviorSubject';
 
 let mqttOptions : mqtt.IClientOptions = {
     host: "ws://test.mosquitto.org",
@@ -20,7 +21,6 @@ let mqttOptions : mqtt.IClientOptions = {
     username: "",
     password: "",
 };
-
 
 export interface Door { 
   readonly name: string
@@ -40,8 +40,8 @@ interface InsideDoor {
 function mkDoor(id:string, client : mqtt.Client, online : boolean) : InsideDoor {
     return { 
       name: id, 
-      isOpen: Subject.create(false),
-      isOnline: Subject.create(online), 
+      isOpen: new BehaviorSubject(false),
+      isOnline: new BehaviorSubject(online), 
       toggle: () => client.publish(`/garage/${id}/command`,"TOGGLE"), 
       activate: () => client.subscribe(`/garage/${id}/+`)
     };
