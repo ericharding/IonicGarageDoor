@@ -62,7 +62,6 @@ export class MyApp {
 
   constructor(public platform: Platform, public statusBar: StatusBar, public splashScreen: SplashScreen) {
     this.initializeApp();
-
     this.initializeMqtt();
   }
 
@@ -74,6 +73,10 @@ export class MyApp {
     this.client.on('error', x => console.log('error: ' + x));
     this.client.on('subscribe', _ => console.log('subscribe'));
     this.client.subscribe("/garage/+/status");
+
+
+    // load saved door
+    let saved_door = window.localStorage.getItem("selected_door");
 
     this.doors = Observable.create(observer => {
       let clients = new Map<string,InsideDoor>();
@@ -91,7 +94,10 @@ export class MyApp {
             else {
               // new door discovered
               console.log("new door " + name);
+              // todo: If name is 'saved_name' navigate to it now
               clients.set(name, mkDoor(name, this.client, isOnline(message)));
+              // Interesting that I need a cast here.  It means Angular is erasign the type in the list...
+              if (name == saved_door) this.selectDoor(clients.get(name) as Door);
               let values = Array.from(clients.values());
               observer.next(values);
             }
@@ -120,7 +126,7 @@ export class MyApp {
 
   selectDoor(door : Door) {
     door.activate();
-    // If we want to enable back:
+    // If we want to enable back: (but it grows the dom)
     // this.nav.push(HomePage, { door: door });
     this.nav.setRoot(HomePage, { door: door });
   }

@@ -24,9 +24,13 @@ export class HomePage {
       this.isOpen = this.activeDoor.isOpen;
       this.isOpenText = this.isOpen.map(b => b ? "OPEN" : "CLOSED");
       this.isOnline = this.activeDoor.isOnline;
+
+      window.localStorage.setItem("selected_door", this.activeDoor.name);
     }
     else {
-      this.menu.open();
+      if(!window.localStorage.getItem("selected_door")) {
+        this.menu.open();
+      }
     }
   }
 
