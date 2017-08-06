@@ -8,32 +8,105 @@ import { HomePage } from '../pages/home/home';
 import * as mqtt from 'mqtt';
 import 'rxjs/Rx';
 import { Observable } from 'rxjs/Observable';
+import { Observer } from 'rxjs/Observer';
+import { Subject } from 'rxjs/Subject';
+
+let mqttOptions : mqtt.IClientOptions = {
+    host: "ws://test.mosquitto.org",
+    port: 8080,
+    keepalive: 60000,
+    reconnectPeriod: 10000,
+    clientId: 'ionic_phone_app_' + Math.floor(Math.random()*9999),
+    username: "",
+    password: "",
+};
+
 
 export interface Door { 
-  name: string
-  isOpen : Observable<boolean>
-  isOnline : Observable<boolean>
-  toggle : () => void;
+  readonly name: string
+  readonly isOpen : Observable<boolean>
+  readonly isOnline : Observable<boolean>
+  readonly activate: () => void;
+  readonly toggle : () => void;
 }
+// Writeable counterpart to Door
+interface InsideDoor {
+  readonly name: string
+  isOpen : Subject<boolean>
+  isOnline : Subject<boolean>
+  readonly activate: () => void;
+  readonly toggle : () => void;
+}
+function mkDoor(id:string, client : mqtt.Client, online : boolean) : InsideDoor {
+    return { 
+      name: id, 
+      isOpen: Subject.create(false),
+      isOnline: Subject.create(online), 
+      toggle: () => client.publish(`/garage/${id}/command`,"TOGGLE"), 
+      activate: () => client.subscribe(`/garage/${id}/+`)
+    };
+}
+
+function isOnline(status : Buffer) { return status.toString() == 'online'; }
+function isOpen(status : Buffer) { return status.toString() == 'OPEN'; }
 
 @Component({
   templateUrl: 'app.html'
 })
 export class MyApp {
   @ViewChild(Nav) nav: Nav;
+  private client : mqtt.Client;
 
   rootPage: any = HomePage;
-
   doors: Observable<Door[]>
 
   constructor(public platform: Platform, public statusBar: StatusBar, public splashScreen: SplashScreen) {
     this.initializeApp();
-    this.doors = Observable.of([
-      { name: "Eric's Door", isOpen: Observable.of(true), isOnline: Observable.of(true), toggle: () => console.log("closed Eric's door") },
-      { name: "Jim's Door", isOpen: Observable.of(false), isOnline: Observable.of(true), toggle: () => console.log("closed Jim's door") },
-      { name: "Zander's Door", isOpen: Observable.of(false), isOnline: Observable.of(false), toggle: () => console.log('closed Zander\'s door') },
-    ]);
 
+    this.initializeMqtt();
+  }
+
+  initializeMqtt() {
+    this.client = mqtt.connect(mqttOptions.host, mqttOptions);
+    this.client.on('connect', () => console.log('connected'));
+    this.client.on('reconnect', () => console.log('reconnect'));
+    this.client.on('offline', () => console.log('offline :('));
+    this.client.on('error', x => console.log('error: ' + x));
+    this.client.on('subscribe', _ => console.log('subscribe'));
+    this.client.subscribe("/garage/+/status");
+
+    this.doors = Observable.create(observer => {
+      let clients = new Map<string,InsideDoor>();
+      let topicrx = /\/garage\/(.*)\/(status|isopen)/;
+      this.client.on('message', (topic,message,packet) => {
+        let match = topicrx.exec(topic);
+        if (match) {
+          let [_, name, chan] = match;
+          let door = clients.get(name);
+          if (chan == "status") {
+            if (door) {
+              // existing door status changed
+              door.isOnline.next(isOnline(message));
+            }
+            else {
+              // new door discovered
+              console.log("new door " + name);
+              clients.set(name, mkDoor(name, this.client, isOnline(message)));
+              let values = Array.from(clients.values());
+              observer.next(values);
+            }
+          }
+          else if (chan == 'isopen') {
+            if (door) {
+              let val = isOpen(message);
+              console.log(`set ${name} isopen: ${val}`);
+              door.isOpen.next(val);
+            }
+          }
+        }
+      });
+    });
+    
   }
 
   initializeApp() {
@@ -45,7 +118,9 @@ export class MyApp {
     });
   }
 
-  selectDoor(door) {
+  selectDoor(door : Door) {
+    door.activate();
+    // If we want to enable back:
     // this.nav.push(HomePage, { door: door });
     this.nav.setRoot(HomePage, { door: door });
   }
